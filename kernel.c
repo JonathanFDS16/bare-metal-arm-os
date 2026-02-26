@@ -17,6 +17,11 @@ typedef unsigned int uint32_t;
 #define NVIC_BASE 			0xE000E100
 #define NVIC_ISER1          (*((volatile uint32_t *)(NVIC_BASE + 0x004))) // Control
 
+#define SYSTICK_BASE 		0xE000E010
+#define SYSTICK_CTRL        (*((volatile uint32_t *)(SYSTICK_BASE))) // Control
+#define SYSTICK_LOAD        (*((volatile uint32_t *)(SYSTICK_BASE + 0x04))) // Control
+#define SYSTICK_VAL         (*((volatile uint32_t *)(SYSTICK_BASE + 0x08))) // Control
+
 
 void usart_print(char* str);
 void usart_send(char c);
@@ -27,11 +32,32 @@ void interrupt_init() {
 	NVIC_ISER1 |= (1 << 5);
 }
 
+void sys_tick_init() {
+	SYSTICK_LOAD = 7999;
+	SYSTICK_VAL = 0;
+
+	SYSTICK_CTRL |= (1 << 0); //Enable Clock
+	SYSTICK_CTRL |= (1 << 1); //Enable TICK Interrupt
+	SYSTICK_CTRL |= (1 << 2); //Select Processor Clock
+}
+
+
 void Usart_IRQHandler() {
 	if (USART1_SR & (1 << 5)) {
 		char r = USART1_DR;
 		shell_send(r);
 	}
+}
+
+int tick_counter = 0;
+void SysTick_Handler() {
+	tick_counter++;
+}
+
+void delay_ms(int ms) {
+	int start = tick_counter;
+	while (tick_counter - start < ms) {}
+	usart_print("waited for 1000ms\n");
 }
 
 void usart_send(char c) {
@@ -40,11 +66,11 @@ void usart_send(char c) {
 	for (int i = 0; i < 100000; i++) asm("nop");
 }
 
-char c;
+char ch;
 char usart_read() {
 	if (USART1_SR & (1 << 5)) {
-		c = USART1_DR;
-		return c;
+		ch = USART1_DR;
+		return ch;
 	}
 	return 0;
 }
@@ -98,17 +124,9 @@ int main(void) {
 
 	usart_print("> ");
 	interrupt_init();
+	sys_tick_init();
     while (1) {
-		//usart_print("Hello\n");
-		//char c = usart_read();
-		//shell_send(c);
-
-		long count = 0;
-        for (long i = 0; i < 1000000000; i++) {
-			asm("nop");
-			count++;
-		}
-		usart_print("MULTITASKING!!!!!\n");
+		delay_ms(1000);
     }
 
     return 0;
