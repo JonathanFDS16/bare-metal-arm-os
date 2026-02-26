@@ -15,6 +15,17 @@ g_pfnVectors:
     .word _estack        /* 1. Initial Stack Pointer (Defined in linker.ld) */
     .word Reset_Handler  /* 2. Reset Handler Address (The function below) */
 
+	.rept 14
+	.word 0
+	.endr
+
+	.equ USART_IRQ_NUM, 37
+	.rept USART_IRQ_NUM
+	.word 0
+	.endr
+
+	.word Usart_IRQHandler // Interrupt Request Handler from USART
+
 /* 4. The Actual Code */
 .section .text
 .type Reset_Handler, %function

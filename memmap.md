@@ -14,3 +14,8 @@ USART1_BASE_ADDR: 0x________ 0x4001 3800 - 0x4001 3BFF USART1
 RCC_APB2ENR_OFFSET: 0x________ offset: 0x18
 GPIOA_CRH_OFFSET:   0x________ offset: 0x04
 USART1_DR_OFFSET:   0x________ offset: 0x04
+
+
+NVIC register block is 0xE000E100
+NVIC_ISER1 offset 0x004
+

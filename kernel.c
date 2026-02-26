@@ -14,7 +14,25 @@ typedef unsigned int uint32_t;
 #define USART1_BRR          (*((volatile uint32_t *)(USART1_BASE_ADDR + 0x08))) // Baud Rate
 #define USART1_CR1          (*((volatile uint32_t *)(USART1_BASE_ADDR + 0x0C))) // Control
 
+#define NVIC_BASE 			0xE000E100
+#define NVIC_ISER1          (*((volatile uint32_t *)(NVIC_BASE + 0x004))) // Control
+
+
 void usart_print(char* str);
+void usart_send(char c);
+void shell_send(char c);
+
+void interrupt_init() {
+	// Enable NVIC
+	NVIC_ISER1 |= (1 << 5);
+}
+
+void Usart_IRQHandler() {
+	if (USART1_SR & (1 << 5)) {
+		char r = USART1_DR;
+		shell_send(r);
+	}
+}
 
 void usart_send(char c) {
 	while (!(USART1_SR & (1 << 7))) {} // While can't send
@@ -36,6 +54,17 @@ void usart_print(char* str) {
 		usart_send(*str);
 		if (*str == '\r') usart_send('\n');
 		str++;
+	}
+}
+
+
+void shell_send(char c) {
+	if (c) {
+		usart_send(c);
+		if (c == '\r') {
+			usart_send('\n');
+			usart_print("> ");
+		}
 	}
 }
 
@@ -62,23 +91,24 @@ int main(void) {
 
     // 4. Enable UART (USART)
     // Bit 13: UE (USART Enable)
+    // Bit 5: RXNEIE (Rx not empty interrup enable)
     // Bit 3:  TE (Transmitter Enable)
     // Bit 2:  RE (Receiver Enable)
-    USART1_CR1 |= (1 << 13) | (1 << 3) | (1 << 2);
+    USART1_CR1 |= (1 << 13) | (1 << 5) | (1 << 3) | (1 << 2);
 
 	usart_print("> ");
+	interrupt_init();
     while (1) {
 		//usart_print("Hello\n");
-		char c = usart_read();
-		if (c) {
-			usart_send(c);
-			if (c == '\r') {
-				usart_send('\n');
-				usart_print("> ");
-			}
-		}
+		//char c = usart_read();
+		//shell_send(c);
 
-        for (int i = 1; i < 100000; i++) asm("nop");
+		long count = 0;
+        for (long i = 0; i < 1000000000; i++) {
+			asm("nop");
+			count++;
+		}
+		usart_print("MULTITASKING!!!!!\n");
     }
 
     return 0;
