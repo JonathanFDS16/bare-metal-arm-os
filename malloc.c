@@ -14,13 +14,14 @@ void init_malloc(void *heap_start, size_t heap_capacity) {
 	usart_print("Heap Starts at: ");
 	print_ptr(heap_start);
 	memories.heap_start = heap_start;
-	memories.current_empty = heap_start + 256; // Give space for my own heap
-	memories.bytes_left = heap_capacity - 256;
+	memories.current_empty = heap_start + 1024; // Give space for my own heap but it will grow into data :(
+	memories.bytes_left = heap_capacity;
 }
 
 void* mmalloc(size_t size) {
 	if (memories.bytes_left < size) {
-		// no more space in the HEAP!
+		usart_print("No space in heap anymore :(\n");
+		return 0;
 	}
 
 	AllocatedMemory alloc = {0};

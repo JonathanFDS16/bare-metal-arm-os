@@ -57,16 +57,26 @@ void delay_ms(int ms) {
 
 
 int _start(void *heap_start) {
-	init_malloc(heap_start, 1024);
+	init_malloc(heap_start, 4 * 25);
 
-	int *ptr = mmalloc(100);
-	*ptr = 100;
-	int *ptr_2 = mmalloc(100);
-	*ptr_2 = 200;
+	int allocnumber = 0;
+	int *ptr = mmalloc(sizeof(int));
+	int *init_ptr = ptr;
+	int *last = ptr;
 
-	usart_print("Ptr and Value\n");
-	print_ptr(ptr);
-	print_int(*ptr);
+	while (ptr) { 
+		*ptr = allocnumber++;
+		last = ptr;
+		ptr = mmalloc(sizeof(int)); 
+	}
+	
+	while (init_ptr != last) {
+		//usart_print("Ptr and Value\n");
+		//print_ptr(init_ptr);
+		print_int(*init_ptr);
+		init_ptr++;
+	}
+
 	
 
     // 1. Enable Clocks (RCC)
