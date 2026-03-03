@@ -1,4 +1,7 @@
-typedef unsigned int uint32_t;
+#include "kernel.h"
+#include "malloc.h"
+#include "utils.h"
+
 // 1. RCC (Power)
 #define RCC_BASE_ADDR       0x40021000
 #define RCC_APB2ENR         (*((volatile uint32_t *)(RCC_BASE_ADDR + 0x18)))
@@ -7,25 +10,16 @@ typedef unsigned int uint32_t;
 #define GPIOA_BASE_ADDR     0x40010800
 #define GPIOA_CRH           (*((volatile uint32_t *)(GPIOA_BASE_ADDR + 0x04)))
 
-// 3. USART (Protocol)
-#define USART1_BASE_ADDR    0x40013800
-#define USART1_SR           (*((volatile uint32_t *)(USART1_BASE_ADDR + 0x00))) // Status Register
-#define USART1_DR           (*((volatile uint32_t *)(USART1_BASE_ADDR + 0x04))) // Data Register
-#define USART1_BRR          (*((volatile uint32_t *)(USART1_BASE_ADDR + 0x08))) // Baud Rate
-#define USART1_CR1          (*((volatile uint32_t *)(USART1_BASE_ADDR + 0x0C))) // Control
-
+// NVIC
 #define NVIC_BASE 			0xE000E100
 #define NVIC_ISER1          (*((volatile uint32_t *)(NVIC_BASE + 0x004))) // Control
 
+// SYSTEM TICK
 #define SYSTICK_BASE 		0xE000E010
 #define SYSTICK_CTRL        (*((volatile uint32_t *)(SYSTICK_BASE))) // Control
 #define SYSTICK_LOAD        (*((volatile uint32_t *)(SYSTICK_BASE + 0x04))) // Control
 #define SYSTICK_VAL         (*((volatile uint32_t *)(SYSTICK_BASE + 0x08))) // Control
 
-
-void usart_print(char* str);
-void usart_send(char c);
-void shell_send(char c);
 
 void interrupt_init() {
 	// Enable NVIC
@@ -60,41 +54,21 @@ void delay_ms(int ms) {
 	usart_print("waited for 1000ms\n");
 }
 
-void usart_send(char c) {
-	while (!(USART1_SR & (1 << 7))) {} // While can't send
-	USART1_DR = c;
-	for (int i = 0; i < 100000; i++) asm("nop");
-}
-
-char ch;
-char usart_read() {
-	if (USART1_SR & (1 << 5)) {
-		ch = USART1_DR;
-		return ch;
-	}
-	return 0;
-}
-
-void usart_print(char* str) {
-	while (*str) {
-		usart_send(*str);
-		if (*str == '\r') usart_send('\n');
-		str++;
-	}
-}
 
 
-void shell_send(char c) {
-	if (c) {
-		usart_send(c);
-		if (c == '\r') {
-			usart_send('\n');
-			usart_print("> ");
-		}
-	}
-}
+int _start(void *heap_start) {
+	init_malloc(heap_start, 1024);
 
-int main(void) {
+	int *ptr = mmalloc(100);
+	*ptr = 100;
+	int *ptr_2 = mmalloc(100);
+	*ptr_2 = 200;
+
+	usart_print("Ptr and Value\n");
+	print_ptr(ptr);
+	print_int(*ptr);
+	
+
     // 1. Enable Clocks (RCC)
     // We need Bit 14 (USART1) and Bit 2 (GPIOA)
     RCC_APB2ENR |= (1 << 14) | (1 << 2);
@@ -125,8 +99,9 @@ int main(void) {
 	usart_print("> ");
 	interrupt_init();
 	sys_tick_init();
+
     while (1) {
-		delay_ms(1000);
+		//delay_ms(1000);
     }
 
     return 0;

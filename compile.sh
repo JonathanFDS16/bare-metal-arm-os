@@ -7,4 +7,4 @@ arm-none-eabi-gcc \
     -nostdlib \
     -T linker.ld \
     -o myos.elf \
-    kernel.c startup.s
+    kernel.c startup.s malloc.c utils.c

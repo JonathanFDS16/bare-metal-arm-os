@@ -19,3 +19,9 @@ USART1_DR_OFFSET:   0x________ offset: 0x04
 NVIC register block is 0xE000E100
 NVIC_ISER1 offset 0x004
 
+
+Cool todos:
+1. malloc and free
+2. running two different processes, savings stack and etc
+3. how would I create a syscall into this kernel so user programs can call and receive something back? Trap instruction
+4. write syscall

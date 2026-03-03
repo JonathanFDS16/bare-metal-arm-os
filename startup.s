@@ -5,6 +5,7 @@
 
 /* 2. Expose the Reset_Handler to the Linker so it can see it */
 .global Reset_Handler
+.global _startheap
 
 /* 3. The Vector Table */
 /* This specific section MUST go at 0x08000000 */
@@ -33,9 +34,9 @@ g_pfnVectors:
 
 Reset_Handler:
     /* Usually we copy data from Flash to RAM here, but for now... */
-    
+    ldr r0, =_startheap
     /* Jump to the C function 'main' */
-    bl main
+    bl _start
     
     /* If main returns (it shouldn't), loop forever */
     b .
