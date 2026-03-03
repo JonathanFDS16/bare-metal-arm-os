@@ -15,10 +15,19 @@
 g_pfnVectors:
     .word _estack        /* 1. Initial Stack Pointer (Defined in linker.ld) */
     .word Reset_Handler  /* 2. Reset Handler Address (The function below) */
-
-	.rept 13
-	.word 0
-	.endr
+	.word 0 // NMI
+	.word 0 // HardFault
+	.word 0 // MemManage
+	.word 0 // BusFault
+	.word 0 // UsageFault
+	.word 0 // Reserved
+	.word 0 // Reserved
+	.word 0 // Reserved
+	.word 0 // Reserved
+	.word SVC_Handler
+	.word 0 // DebugMon
+	.word 0 // Reserved
+	.word 0 // PendSV
 	.word SysTick_Handler
 
 	.equ USART_IRQ_NUM, 37

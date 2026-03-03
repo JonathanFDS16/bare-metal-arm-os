@@ -42,6 +42,10 @@ void Usart_IRQHandler() {
 	}
 }
 
+void SVC_Handler(void) {
+	usart_print("Syscall Called");
+}
+
 int tick_counter = 0;
 void SysTick_Handler() {
 	tick_counter++;
@@ -110,7 +114,8 @@ int _start(void *heap_start) {
 	sys_tick_init();
 
     while (1) {
-		//delay_ms(1000);
+		delay_ms(1000);
+		__asm__ volatile ("svc #1");
     }
 
     return 0;
