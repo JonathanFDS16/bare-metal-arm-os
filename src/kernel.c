@@ -1,4 +1,3 @@
-#include "kernel.h"
 #include "malloc.h"
 #include "utils.h"
 
