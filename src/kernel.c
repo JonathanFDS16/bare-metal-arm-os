@@ -67,19 +67,14 @@ int _start(void *heap_start) {
 	int *init_ptr = ptr;
 	int *last = ptr;
 
-	while (ptr) { 
+	while (allocnumber < 5) { 
 		*ptr = allocnumber++;
 		last = ptr;
+		usart_print("Ptr and Value\n");
+		print_ptr(ptr);
+		print_int(*ptr);
 		ptr = mmalloc(sizeof(int)); 
 	}
-	
-	while (init_ptr != last) {
-		//usart_print("Ptr and Value\n");
-		//print_ptr(init_ptr);
-		print_int(*init_ptr);
-		init_ptr++;
-	}
-
 	
 
     // 1. Enable Clocks (RCC)
@@ -114,8 +109,8 @@ int _start(void *heap_start) {
 	sys_tick_init();
 
     while (1) {
-		delay_ms(1000);
-		__asm__ volatile ("svc #1");
+		//delay_ms(1000);
+		//__asm__ volatile ("svc #1");
     }
 
     return 0;
