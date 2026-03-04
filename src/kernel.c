@@ -70,11 +70,12 @@ int _start(void *heap_start) {
 	while (allocnumber < 5) { 
 		*ptr = allocnumber++;
 		last = ptr;
-		usart_print("Ptr and Value\n");
+		usart_print("Malloc returned allocated ptr: ");
 		print_ptr(ptr);
-		print_int(*ptr);
 		ptr = mmalloc(sizeof(int)); 
 	}
+
+	free(ptr);
 	
 
     // 1. Enable Clocks (RCC)

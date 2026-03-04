@@ -32,6 +32,7 @@ typedef struct Header {
 
 Header *start_heap_ptr = 0;
 Header *last_header_ptr = 0;
+void *last_allocable_addr = 0;
 
 
 /* [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
@@ -43,6 +44,7 @@ Header *last_header_ptr = 0;
 void init_malloc(void *heap_start, size_t heap_capacity) {
 	usart_print("Heap Starts at: ");
 	print_ptr(heap_start);
+	last_allocable_addr = heap_start + heap_capacity;
 	start_heap_ptr = ((Header*)heap_start);
 	Header h = {.next_header_ptr=0, .alloc_size=0};
 	*start_heap_ptr = h;
@@ -50,6 +52,11 @@ void init_malloc(void *heap_start, size_t heap_capacity) {
 }
 
 void* mmalloc(size_t size) {
+	if ((void*)last_header_ptr + sizeof(Header) + last_header_ptr->alloc_size + sizeof(Header) + size >= last_allocable_addr) {
+		usart_print("can't malloc anymore :(\n");
+		return 0;
+	}
+
 	if (!last_header_ptr->next_header_ptr) { 
 		last_header_ptr->next_header_ptr = (void*)last_header_ptr + sizeof(Header) + last_header_ptr->alloc_size;
 	}
@@ -64,6 +71,15 @@ void* mmalloc(size_t size) {
 }
 
 void free(void *ptr) {
-	// frees the memory of the OS
-	// go over list of pointers and delete the pointer? 
+	Header *copy = start_heap_ptr->next_header_ptr;
+	while (copy->next_header_ptr && ptr != copy + 1) {
+		copy = (void*)copy + sizeof(Header) + copy->alloc_size;
+		usart_print("ptr != copy + 1\n");
+		print_ptr(ptr);
+		print_ptr(copy + 1);
+	}
+	if (ptr == copy + 1) {
+		usart_print("Memory Freed\n");
+		// TODO implement the freeing method
+	}
 }
