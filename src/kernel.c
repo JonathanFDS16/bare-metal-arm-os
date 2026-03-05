@@ -19,6 +19,11 @@
 #define SYSTICK_LOAD        (*((volatile uint32_t *)(SYSTICK_BASE + 0x04))) // Control
 #define SYSTICK_VAL         (*((volatile uint32_t *)(SYSTICK_BASE + 0x08))) // Control
 
+#define SCB_BASE 			0xE000ED00
+#define SCB_ICSR			(*((volatile uint32_t *)(SCB_BASE + 0x04)))
+
+
+void delay_ms(int ms);
 
 void interrupt_init() {
 	// Enable NVIC
@@ -46,6 +51,74 @@ void SVC_Handler(void) {
 	usart_print("Syscall Called");
 }
 
+typedef struct Task {
+	unsigned int *sp;
+} Task;
+
+Task *task[2] = {0};
+
+__attribute__((naked)) void PendSV_Handler(void) {
+	/* PendSV
+	 *• R0-R3, R12
+	 • Return address
+	 • PSR
+	 • LR.
+
+	 r13 = SP
+	 save R4-11 into SP using STMDB/PUSH
+	 This will move the SP down therefore we need to update the saved address into a struct.
+	 Now we have a SP will all the data we need. When coming back we will need to pop a few but not all.
+
+	 // switch
+	 Get a new task SP
+	 pop the stack (which has the saved r4-11) use LDMIA
+	 write the SP into r13(the CPU SP)
+	 execute bx lr --> calls the return sequecce
+
+Immediately after stacking, the stack pointer indicates the lowest address in the stack frame. 
+
+	 The stack frame includes the return address. This is the address of the next instruction in
+the interrupted program. This value is restored to the PC at exception return so that the
+interrupted program resumes.
+	--> Thus I need to change the return address? Or do I need to point the PC manually
+
+	When I load EXC_RETURN into PC using some instructions the processor will start the return sequence.
+
+	 * */
+	asm("PUSH {R4-R11}"); //save the rest in the stack
+	asm("MOV R0, R13"); // save the new stack address
+	asm("PUSH {LR}");
+	asm("BL schedule_next"); //will load a new address in R0
+	asm("POP {LR}");
+	asm("MOV R13, R0"); // move new stack in R0 to CPU stack
+	asm("POP {R4-R11}"); // popped R4-r11 from the stack to the CPU
+	asm("BX LR");
+}
+
+int count = 0;
+void* schedule_next(void* old_sp) {
+//	int index = count % 2;
+//	if (task[0] == 0) {
+//		*task[0] = (Task){.sp = old_sp};
+//	}
+	usart_print("OMG WE ARE ALMOST SCHEDULING");
+	return old_sp;
+}
+
+void task1() {
+	while (1) {
+		delay_ms(1000);
+		usart_print("task1\n");
+	}
+}
+
+void task2() {
+	while (1) {
+		delay_ms(1000);
+		usart_print("task2\n");
+	}
+}
+
 int tick_counter = 0;
 void SysTick_Handler() {
 	tick_counter++;
@@ -56,7 +129,6 @@ void delay_ms(int ms) {
 	while (tick_counter - start < ms) {}
 	usart_print("waited for 1000ms\n");
 }
-
 
 
 int _start(void *heap_start) {
@@ -110,7 +182,8 @@ int _start(void *heap_start) {
 	sys_tick_init();
 
     while (1) {
-		//delay_ms(1000);
+		delay_ms(1000);
+		SCB_ICSR |= (1 << 28);
 		//__asm__ volatile ("svc #1");
     }
 

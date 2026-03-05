@@ -81,5 +81,9 @@ void free(void *ptr) {
 	if (ptr == copy + 1) {
 		usart_print("Memory Freed\n");
 		// TODO implement the freeing method
+		/*
+		 * Idea is to link previous with next header
+		 * Then when allocating again we check if between headers there is enough space
+		 * */
 	}
 }

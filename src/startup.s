@@ -27,7 +27,7 @@ g_pfnVectors:
 	.word SVC_Handler
 	.word 0 // DebugMon
 	.word 0 // Reserved
-	.word 0 // PendSV
+	.word PendSV_Handler
 	.word SysTick_Handler
 
 	.equ USART_IRQ_NUM, 37
