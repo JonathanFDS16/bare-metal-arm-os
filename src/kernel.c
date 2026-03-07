@@ -24,6 +24,7 @@
 
 
 void delay_ms(int ms);
+void context_switch();
 
 void interrupt_init() {
 	// Enable NVIC
@@ -55,7 +56,7 @@ typedef struct Task {
 	unsigned int *sp;
 } Task;
 
-Task *task[2] = {0};
+Task task[2] = {0};
 
 __attribute__((naked)) void PendSV_Handler(void) {
 	/* PendSV
@@ -63,49 +64,65 @@ __attribute__((naked)) void PendSV_Handler(void) {
 	 • Return address
 	 • PSR
 	 • LR.
-
-	 r13 = SP
-	 save R4-11 into SP using STMDB/PUSH
-	 This will move the SP down therefore we need to update the saved address into a struct.
-	 Now we have a SP will all the data we need. When coming back we will need to pop a few but not all.
-
-	 // switch
-	 Get a new task SP
-	 pop the stack (which has the saved r4-11) use LDMIA
-	 write the SP into r13(the CPU SP)
-	 execute bx lr --> calls the return sequecce
-
-Immediately after stacking, the stack pointer indicates the lowest address in the stack frame. 
-
-	 The stack frame includes the return address. This is the address of the next instruction in
-the interrupted program. This value is restored to the PC at exception return so that the
-interrupted program resumes.
-	--> Thus I need to change the return address? Or do I need to point the PC manually
-
-	When I load EXC_RETURN into PC using some instructions the processor will start the return sequence.
-
-	 * */
-	asm("PUSH {R4-R11}"); //save the rest in the stack
-	asm("MOV R0, R13"); // save the new stack address
-	asm("PUSH {LR}");
+	 */
+	asm("MRS R0, PSP"); // Save PSP in R0. What if PSP is not set yet
+	asm("STMDB R0!, {R4-R11}"); // Push to PSP R4-R11
+	// asm("MOV R0, R13"); This is wrong I am saving the MSP instead of the PSP
+	asm("PUSH {LR}"); // Save LR in MSP
 	asm("BL schedule_next"); //will load a new address in R0
-	asm("POP {LR}");
-	asm("MOV R13, R0"); // move new stack in R0 to CPU stack
-	asm("POP {R4-R11}"); // popped R4-r11 from the stack to the CPU
-	asm("BX LR");
+	asm("POP {LR}"); // Get LR from MSP again
+	asm("LDMIA R0!, {R4-R11}"); // Pop from PSP R4-R11
+	//asm("MOV R14, R0"); this is wrong I am replace MSP with PSP I suppose
+	asm("MSR PSP, R0"); // Write the new PSP in R0 to the current PSP
+	asm("BX LR");// What does this do?
 }
 
 int count = 0;
 void* schedule_next(void* old_sp) {
-//	int index = count % 2;
-//	if (task[0] == 0) {
-//		*task[0] = (Task){.sp = old_sp};
-//	}
-	usart_print("OMG WE ARE ALMOST SCHEDULING");
-	return old_sp;
+	count++;
+	int index = count % 2;
+	usart_print("Scheduling this SP: ");
+	print_ptr(task[index].sp);
+	return task[index].sp;
+}
+
+unsigned int stack_task_1[512];
+unsigned int stack_task_2[512];
+void schedule_task(int id, void* stack_addr, void (*task_func)()) {
+	unsigned int *s_ptr = (unsigned int*)stack_addr + 512;
+	s_ptr--;
+	*(s_ptr--) = 0x0100000e; //xPSR
+	*(s_ptr--) = (unsigned int)task_func; //PC
+	*(s_ptr--) = 0xFFFFFFFD; //LR
+	*(s_ptr--) = 0; //r12
+	*(s_ptr--) = 0; //r3
+	*(s_ptr--) = 0; //r2
+	*(s_ptr--) = 0; //r1
+	*(s_ptr--) = 0; //r0
+	*(s_ptr--) = 0; //R11
+	*(s_ptr--) = 0; //R10
+	*(s_ptr--) = 0; //R9
+	*(s_ptr--) = 0; //R8
+	*(s_ptr--) = 0; //R7
+	*(s_ptr--) = 0; //R6
+	*(s_ptr--) = 0; //R5
+	*(s_ptr) = 0; //R4 // TOP 0x200009cc
+	usart_print("Start Stack pointer for task: ");
+	print_int(id);
+	usart_print(" ");
+	print_ptr(s_ptr);
+	usart_print("Stack - 1 (size 4 bytes): ");
+	print_int(id);
+	usart_print(" ");
+	print_ptr(s_ptr - 0x1);
+
+	usart_print("TaskFunct address: ");
+	print_ptr(task_func);
+	task[id] = (Task){.sp=s_ptr};
 }
 
 void task1() {
+	usart_print("task1 called\n");
 	while (1) {
 		delay_ms(1000);
 		usart_print("task1\n");
@@ -124,6 +141,10 @@ void SysTick_Handler() {
 	tick_counter++;
 }
 
+void context_switch() {
+	SCB_ICSR |= (1 << 28);
+}
+
 void delay_ms(int ms) {
 	int start = tick_counter;
 	while (tick_counter - start < ms) {}
@@ -134,22 +155,8 @@ void delay_ms(int ms) {
 int _start(void *heap_start) {
 	init_malloc(heap_start, 4 * 25);
 
-	int allocnumber = 0;
-	int *ptr = mmalloc(sizeof(int));
-	int *init_ptr = ptr;
-	int *last = ptr;
-
-	while (allocnumber < 5) { 
-		*ptr = allocnumber++;
-		last = ptr;
-		usart_print("Malloc returned allocated ptr: ");
-		print_ptr(ptr);
-		ptr = mmalloc(sizeof(int)); 
-	}
-
-	free(ptr);
-	
-
+	schedule_task(0, stack_task_1, *task1);
+	schedule_task(1, stack_task_2, *task2);
     // 1. Enable Clocks (RCC)
     // We need Bit 14 (USART1) and Bit 2 (GPIOA)
     RCC_APB2ENR |= (1 << 14) | (1 << 2);
@@ -183,7 +190,8 @@ int _start(void *heap_start) {
 
     while (1) {
 		delay_ms(1000);
-		SCB_ICSR |= (1 << 28);
+		usart_print("Switching Context\n");
+		context_switch();
 		//__asm__ volatile ("svc #1");
     }
 
