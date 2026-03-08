@@ -72,19 +72,14 @@ __attribute__((naked)) void PendSV_Handler(void) {
 
         // --- SAVE CONTEXT (Only if PSP != 0) ---
         "STMDB R0!, {R4-R11} \n"     // Save R4-R11
-        "PUSH {LR} \n"               // Save LR in MSP
-        "BL schedule_next \n"        // Select Next Task
-        "POP {LR} \n"                // Restore LR from MSP
+		"B restore_context\n"
 
-        "B finish_switch \n"         // Jump to finish
-
-        // --- RESTORE CONTEXT (Label) ---
         "restore_context: \n"
         "PUSH {LR} \n"               // We still need to call schedule_next for the first task!
-        "BL schedule_next \n"        // This will return Task 0's SP
+        "BL schedule_next \n"        // This R0 has PSP which will pass to Schedule Next
         "POP {LR} \n"
 
-		"ORR LR, LR, #4\n"
+		"ORR LR, LR, #4\n" // Ensure LR has returns to Thread PSP
 
         // --- FINISH ---
         "finish_switch: \n"
@@ -98,6 +93,12 @@ int count = 0;
 void* schedule_next(void* old_sp) {
 	count++;
 	int index = count % 2;
+	if (index == 1 && old_sp) {
+		task[0].sp = old_sp;
+	}
+	else if (old_sp) {
+		task[1].sp = old_sp;
+	}
 	return task[index].sp;
 }
 
