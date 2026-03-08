@@ -65,25 +65,45 @@ __attribute__((naked)) void PendSV_Handler(void) {
 	 • PSR
 	 • LR.
 	 */
-	asm("MRS R0, PSP"); // Save PSP in R0. What if PSP is not set yet
-	asm("STMDB R0!, {R4-R11}"); // Push to PSP R4-R11
-	// asm("MOV R0, R13"); This is wrong I am saving the MSP instead of the PSP
-	asm("PUSH {LR}"); // Save LR in MSP
-	asm("BL schedule_next"); //will load a new address in R0
-	asm("POP {LR}"); // Get LR from MSP again
-	asm("LDMIA R0!, {R4-R11}"); // Pop from PSP R4-R11
-	//asm("MOV R14, R0"); this is wrong I am replace MSP with PSP I suppose
-	asm("MSR PSP, R0"); // Write the new PSP in R0 to the current PSP
-	asm("BX LR");// What does this do?
+	__asm volatile (
+        "MRS R0, PSP \n"             // Read PSP
+        "CMP R0, #0 \n"              // Is it 0? (First run?)
+        "BEQ restore_context \n"     // If 0, SKIP saving!
+
+        // --- SAVE CONTEXT (Only if PSP != 0) ---
+        "STMDB R0!, {R4-R11} \n"     // Save R4-R11
+        "PUSH {LR} \n"               // Save LR in MSP
+        "BL schedule_next \n"        // Select Next Task
+        "POP {LR} \n"                // Restore LR from MSP
+
+        "B finish_switch \n"         // Jump to finish
+
+        // --- RESTORE CONTEXT (Label) ---
+        "restore_context: \n"
+        "PUSH {LR} \n"               // We still need to call schedule_next for the first task!
+        "BL schedule_next \n"        // This will return Task 0's SP
+        "POP {LR} \n"
+
+		"ORR LR, LR, #4\n"
+
+        // --- FINISH ---
+        "finish_switch: \n"
+        "LDMIA R0!, {R4-R11} \n"     // Restore R4-R11
+        "MSR PSP, R0 \n"             // Update PSP to the new stack
+        "BX LR \n"                   // Return
+    );
 }
 
 int count = 0;
 void* schedule_next(void* old_sp) {
 	count++;
 	int index = count % 2;
-	usart_print("Scheduling this SP: ");
-	print_ptr(task[index].sp);
 	return task[index].sp;
+}
+
+void task_return_trap(void) {
+    usart_print("CRITICAL: A Task returned! Freezing.");
+    while(1); // Trap the CPU here
 }
 
 unsigned int stack_task_1[512];
@@ -91,9 +111,9 @@ unsigned int stack_task_2[512];
 void schedule_task(int id, void* stack_addr, void (*task_func)()) {
 	unsigned int *s_ptr = (unsigned int*)stack_addr + 512;
 	s_ptr--;
-	*(s_ptr--) = 0x0100000e; //xPSR
+	*(s_ptr--) = 0x01000000; //xPSR
 	*(s_ptr--) = (unsigned int)task_func; //PC
-	*(s_ptr--) = 0xFFFFFFFD; //LR
+	*(s_ptr--) = (unsigned int)task_return_trap; //LR stores the return address 
 	*(s_ptr--) = 0; //r12
 	*(s_ptr--) = 0; //r3
 	*(s_ptr--) = 0; //r2
@@ -107,32 +127,24 @@ void schedule_task(int id, void* stack_addr, void (*task_func)()) {
 	*(s_ptr--) = 0; //R6
 	*(s_ptr--) = 0; //R5
 	*(s_ptr) = 0; //R4 // TOP 0x200009cc
-	usart_print("Start Stack pointer for task: ");
-	print_int(id);
-	usart_print(" ");
-	print_ptr(s_ptr);
-	usart_print("Stack - 1 (size 4 bytes): ");
-	print_int(id);
-	usart_print(" ");
-	print_ptr(s_ptr - 0x1);
-
-	usart_print("TaskFunct address: ");
-	print_ptr(task_func);
 	task[id] = (Task){.sp=s_ptr};
 }
 
 void task1() {
 	usart_print("task1 called\n");
 	while (1) {
-		delay_ms(1000);
+		//delay_ms(1000);
 		usart_print("task1\n");
+		context_switch();
 	}
 }
 
 void task2() {
+	usart_print("task2 called\n");
 	while (1) {
-		delay_ms(1000);
+		//delay_ms(1000);
 		usart_print("task2\n");
+		context_switch();
 	}
 }
 
@@ -192,7 +204,6 @@ int _start(void *heap_start) {
 		delay_ms(1000);
 		usart_print("Switching Context\n");
 		context_switch();
-		//__asm__ volatile ("svc #1");
     }
 
     return 0;
