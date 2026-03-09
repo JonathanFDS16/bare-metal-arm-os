@@ -1,5 +1,6 @@
 #include "malloc.h"
 #include "utils.h"
+#include "scheduler.h"
 
 // 1. RCC (Power)
 #define RCC_BASE_ADDR       0x40021000
@@ -22,7 +23,6 @@
 #define SCB_BASE 			0xE000ED00
 #define SCB_ICSR			(*((volatile uint32_t *)(SCB_BASE + 0x04)))
 
-
 void delay_ms(int ms);
 void context_switch();
 
@@ -32,7 +32,7 @@ void interrupt_init() {
 }
 
 void sys_tick_init() {
-	SYSTICK_LOAD = 7999;
+	SYSTICK_LOAD = 799999;
 	SYSTICK_VAL = 0;
 
 	SYSTICK_CTRL |= (1 << 0); //Enable Clock
@@ -52,124 +52,40 @@ void SVC_Handler(void) {
 	usart_print("Syscall Called");
 }
 
-typedef struct Task {
-	unsigned int *sp;
-} Task;
-
-Task task[2] = {0};
-
-__attribute__((naked)) void PendSV_Handler(void) {
-	/* PendSV
-	 *• R0-R3, R12
-	 • Return address
-	 • PSR
-	 • LR.
-	 */
-	__asm volatile (
-        "MRS R0, PSP \n"             // Read PSP
-        "CMP R0, #0 \n"              // Is it 0? (First run?)
-        "BEQ restore_context \n"     // If 0, SKIP saving!
-
-        // --- SAVE CONTEXT (Only if PSP != 0) ---
-        "STMDB R0!, {R4-R11} \n"     // Save R4-R11
-		"B restore_context\n"
-
-        "restore_context: \n"
-        "PUSH {LR} \n"               // We still need to call schedule_next for the first task!
-        "BL schedule_next \n"        // This R0 has PSP which will pass to Schedule Next
-        "POP {LR} \n"
-
-		"ORR LR, LR, #4\n" // Ensure LR has returns to Thread PSP
-
-        // --- FINISH ---
-        "finish_switch: \n"
-        "LDMIA R0!, {R4-R11} \n"     // Restore R4-R11
-        "MSR PSP, R0 \n"             // Update PSP to the new stack
-        "BX LR \n"                   // Return
-    );
-}
-
-int count = 0;
-void* schedule_next(void* old_sp) {
-	count++;
-	int index = count % 2;
-	if (index == 1 && old_sp) {
-		task[0].sp = old_sp;
-	}
-	else if (old_sp) {
-		task[1].sp = old_sp;
-	}
-	return task[index].sp;
-}
-
-void task_return_trap(void) {
-    usart_print("CRITICAL: A Task returned! Freezing.");
-    while(1); // Trap the CPU here
-}
-
 unsigned int stack_task_1[512];
 unsigned int stack_task_2[512];
-void schedule_task(int id, void* stack_addr, void (*task_func)()) {
-	unsigned int *s_ptr = (unsigned int*)stack_addr + 512;
-	s_ptr--;
-	*(s_ptr--) = 0x01000000; //xPSR
-	*(s_ptr--) = (unsigned int)task_func; //PC
-	*(s_ptr--) = (unsigned int)task_return_trap; //LR stores the return address 
-	*(s_ptr--) = 0; //r12
-	*(s_ptr--) = 0; //r3
-	*(s_ptr--) = 0; //r2
-	*(s_ptr--) = 0; //r1
-	*(s_ptr--) = 0; //r0
-	*(s_ptr--) = 0; //R11
-	*(s_ptr--) = 0; //R10
-	*(s_ptr--) = 0; //R9
-	*(s_ptr--) = 0; //R8
-	*(s_ptr--) = 0; //R7
-	*(s_ptr--) = 0; //R6
-	*(s_ptr--) = 0; //R5
-	*(s_ptr) = 0; //R4 // TOP 0x200009cc
-	task[id] = (Task){.sp=s_ptr};
-}
 
-void task1() {
-	usart_print("task1 called\n");
-	while (1) {
-		//delay_ms(1000);
-		usart_print("task1\n");
-		context_switch();
-	}
-}
-
-void task2() {
-	usart_print("task2 called\n");
-	while (1) {
-		//delay_ms(1000);
-		usart_print("task2\n");
-		context_switch();
-	}
-}
 
 int tick_counter = 0;
 void SysTick_Handler() {
 	tick_counter++;
+	context_switch();
 }
 
 void context_switch() {
 	SCB_ICSR |= (1 << 28);
 }
 
-void delay_ms(int ms) {
-	int start = tick_counter;
-	while (tick_counter - start < ms) {}
-	usart_print("waited for 1000ms\n");
+void task1() {
+	usart_print("task1 called\n");
+	while (1) {
+		usart_print("task1\n");
+	}
 }
 
+void task2() {
+	usart_print("task2 called\n");
+	while (1) {
+		usart_print("task2\n");
+	}
+}
 
 int _start(void *heap_start) {
-	init_malloc(heap_start, 4 * 25);
+	init_malloc(heap_start, 2048);
 
-	schedule_task(0, stack_task_1, *task1);
-	schedule_task(1, stack_task_2, *task2);
+	create_thread(*task1);
+	create_thread(*task2);
+
     // 1. Enable Clocks (RCC)
     // We need Bit 14 (USART1) and Bit 2 (GPIOA)
     RCC_APB2ENR |= (1 << 14) | (1 << 2);
@@ -200,12 +116,7 @@ int _start(void *heap_start) {
 	usart_print("> ");
 	interrupt_init();
 	sys_tick_init();
-
-    while (1) {
-		delay_ms(1000);
-		usart_print("Switching Context\n");
-		context_switch();
-    }
+	context_switch();
 
     return 0;
 }
