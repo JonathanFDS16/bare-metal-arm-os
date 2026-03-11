@@ -16,15 +16,19 @@ SECTIONS
         *(.rodata)
 	} > FLASH  
 
+	_sdata_flash = LOADADDR(.data);
+
     .data : { 
 		. = ALIGN(4);
+		_sdata = .;
 		*(.data)
 		. = ALIGN(4);
 		_edata = .;
-	} > RAM   
+	} > RAM AT> FLASH
 
     .bss :{ 
 		. = ALIGN(4);
+		_sbss = .;
 		*(.bss)
 		. = ALIGN(4);
 		_ebss = .;

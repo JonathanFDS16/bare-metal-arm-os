@@ -24,11 +24,11 @@ Token tokens[MAX_TOKEN_AMOUNT] = {0};
 void lex_line(char *str, int max);
 void parse_tokens(Token *tokens);
 void help();
-void reboot();
+void reboot_user();
 void invalid_input();
 
 void run_shell() {
-	usart_print("> ");
+	usart_print("\033[2J\033[1;1H> ");
 	char buf[MAX_BUFF_AMOUNT];
 	int i = 0;
 	while (1) {
@@ -129,7 +129,7 @@ void parse_tokens(Token *tokens) {
 	// Let's assume one token for now
 	switch (tokens->type) {
 		case REBOOT:
-			reboot();
+			reboot_user();
 			break;
 		case HELP:
 			// gather all tokens [cmd] [args...]
@@ -145,8 +145,9 @@ void help() {
 	usart_print("HELPING YOU IS A PLEASURE (Not Implemented) :)\n");
 }
 
-void reboot() {
+void reboot_user() {
 	usart_print("REBOOTING THIS MACHINE IS CRAZY WORK :D (Not Implemented)\n");
+	reboot();
 }
 
 void invalid_input() {

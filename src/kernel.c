@@ -23,12 +23,19 @@
 
 #define SCB_BASE 			0xE000ED00
 #define SCB_ICSR			(*((volatile uint32_t *)(SCB_BASE + 0x04)))
+#define SCB_AIRCR			(*((volatile uint32_t *)(SCB_BASE + 0x0C)))
 
 #define USART_BUFFER_SIZE 128
 #define ALLOC_HEAP_SIZE_BYTES 4096 //4096 bytes
 
 void delay_ms(int ms);
 void context_switch();
+void reset();
+
+enum STACK_TYPE {
+	MSP,
+	PSP
+};
 
 void interrupt_init() {
 	// Enable NVIC
@@ -61,8 +68,64 @@ char poll_usart() {
 	return 0;
 }
 
+enum STACK_TYPE get_stack_type(int mask) {
+	switch (mask) {
+		case 0x1: return MSP;
+		case 0x9: return MSP;
+		case 0xd: return PSP;
+	}
+	return -1;
+}
+
 void SVC_Handler(void) {
-	usart_print("Syscall Called");
+	/*
+	 * Incredible discovery :) The way to collect the service code is by literally
+	 * reading the encoded machine code and mask out the immediate from there
+	 *
+	 * 1. Get what stack the PC will be (MSP or PSP)
+	 * 2. Then get the read the address of SP+0x18 (PC)
+	 * 3. Addr -2 (SVC is 2 butes long) = where the SVC Imm encoded is located
+	 *
+	 * Ex.: PSP PC is 80004ca, then -2 = 80004c8. If I collect only 2 bytes from this address
+	 * I will have df01 which means SVC 01
+	 *  80004c8:	df01      	svc	1
+	 * 	80004ca:	bf00      	nop
+	 * */
+	size_t lr_register;
+	__asm__ volatile (
+			"MOV %[res], LR\n\t"
+			: [res] "=r" (lr_register)
+			);
+	int mask = lr_register & 0x0000000F; //this keeps the last of EXC_RETURN
+	enum STACK_TYPE type = get_stack_type(mask);
+
+	void *sp;
+	if (type == MSP) {
+		__asm__ volatile (
+				"MRS %[res], MSP\n\t"
+				: [res] "=r" (sp)
+				);
+	}
+	else if (type == PSP) {
+		__asm__ volatile (
+				"MRS %[res], PSP\n\t"
+				: [res] "=r" (sp)
+				);
+	}
+	
+	size_t *pc_ptr = (sp + 0x18);
+	size_t *enc_addr = (size_t*)(*pc_ptr - 0x2);
+	int svc_imm = *enc_addr & 0x000000FF;
+
+	switch(svc_imm) {
+		case 1:
+			usart_print("Called service 1\n");
+			reset();
+			break;
+		default:
+			usart_print("svc not implemented\n");
+			print_int(svc_imm);
+	}
 }
 
 int tick_counter = 0;
@@ -87,6 +150,30 @@ void task2() {
 	while (1) {
 		//usart_print("task2\n");
 	}
+}
+
+void reset() {
+	usart_print("reset requested\n");
+	usart_print("value read of AIRCR: ");
+	print_ptr((void*)SCB_AIRCR);
+
+	size_t value = SCB_AIRCR;
+    
+    value &= 0x0000FFFF;         // Clear the read-back key
+    value |= (0x5FA << 16);      // Write magic key 0x05FA into upper 16 bits
+    value |= (1 << 2);           // Set SYSRESETREQ (Bit 2)
+    
+    // Ensure all memory operations finish before triggering reset
+    __asm__ volatile("dsb" : : : "memory");
+
+    SCB_AIRCR = value;
+
+    // Flush the instruction pipeline
+    __asm__ volatile("isb");
+
+    // Trap the CPU while the hardware reset asserts
+    while (1) {
+    }
 }
 
 int _start(void *heap_start) {

@@ -36,16 +36,3 @@ g_pfnVectors:
 	.endr
 
 	.word Usart_IRQHandler // Interrupt Request Handler from USART
-
-/* 4. The Actual Code */
-.section .text
-.type Reset_Handler, %function
-
-Reset_Handler:
-    /* Usually we copy data from Flash to RAM here, but for now... */
-    ldr r0, =_startheap
-    /* Jump to the C function 'main' */
-    bl _start
-    
-    /* If main returns (it shouldn't), loop forever */
-    b .
