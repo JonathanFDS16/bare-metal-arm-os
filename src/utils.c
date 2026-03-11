@@ -76,6 +76,19 @@ void print_int(int value)
     usart_send('\n');
 }
 
+// FIXME Big assumption that both strings are null terminated lol
+int strcmp(const char *str, const char *str2) {
+	while (*str && *str2) {
+		if (*str != *str2) {
+			return 0;
+		}
+		str++;
+		str2++;
+	}
+	if (*str != *str2)
+		return 0;
+	return 1;
+}
 
 void shell_send(char c) {
 	if (c) {

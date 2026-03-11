@@ -18,5 +18,7 @@ void usart_print(char* str);
 void print_ptr(void *ptr);
 void print_int(int value);
 
+int strcmp(const char *str, const char *str2);
+
 void shell_send(char c);
 #endif

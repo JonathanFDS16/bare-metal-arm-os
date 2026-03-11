@@ -42,14 +42,15 @@ void task_return_trap(void) {
 }
 
 int count = 0;
+int amount_tasks = 0;
 void* schedule_next(void* old_sp) {
 	count++;
-	int index = count % 2;
-	if (index == 1 && old_sp) {
-		tasks[0].sp = old_sp;
-	}
-	else if (old_sp) {
-		tasks[1].sp = old_sp;
+	int index = count % amount_tasks;
+	if (old_sp) {
+		if (index > 0)
+			tasks[index - 1].sp = old_sp;
+		else
+		 	tasks[amount_tasks - 1].sp = old_sp;
 	}
 	return tasks[index].sp;
 }
@@ -61,6 +62,7 @@ void create_thread(void (*task_func)()) {
 		return;
 	}
 	void *stack = mmalloc(256);
+	usart_print("Adding task to queue\n");
 	schedule_task(task_id++, stack, task_func);
 }
 
@@ -84,4 +86,5 @@ void schedule_task(int id, void* stack_addr, void (*task_func)()) {
 	*(s_ptr--) = 0; //R5
 	*(s_ptr) = 0; //R4 
 	tasks[id] = (Task){.sp=s_ptr};
+	amount_tasks++;
 }

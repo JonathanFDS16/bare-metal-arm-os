@@ -1,6 +1,7 @@
 #include "malloc.h"
 #include "utils.h"
 #include "scheduler.h"
+#include "shell.h"
 
 // 1. RCC (Power)
 #define RCC_BASE_ADDR       0x40021000
@@ -23,6 +24,8 @@
 #define SCB_BASE 			0xE000ED00
 #define SCB_ICSR			(*((volatile uint32_t *)(SCB_BASE + 0x04)))
 
+#define USART_BUFFER_SIZE 128
+
 void delay_ms(int ms);
 void context_switch();
 
@@ -40,21 +43,26 @@ void sys_tick_init() {
 	SYSTICK_CTRL |= (1 << 2); //Select Processor Clock
 }
 
-
+char usart_buffer[USART_BUFFER_SIZE];
+int usart_index = 0;
 void Usart_IRQHandler() {
 	if (USART1_SR & (1 << 5)) {
 		char r = USART1_DR;
-		shell_send(r);
+		usart_buffer[usart_index++] = r;
 	}
+}
+
+char poll_usart() {
+	if (usart_index) {
+		char c = usart_buffer[--usart_index];
+		return c;
+	}
+	return 0;
 }
 
 void SVC_Handler(void) {
 	usart_print("Syscall Called");
 }
-
-unsigned int stack_task_1[512];
-unsigned int stack_task_2[512];
-
 
 int tick_counter = 0;
 void SysTick_Handler() {
@@ -69,22 +77,23 @@ void context_switch() {
 void task1() {
 	usart_print("task1 called\n");
 	while (1) {
-		usart_print("task1\n");
+		//usart_print("task1\n");
 	}
 }
 
 void task2() {
 	usart_print("task2 called\n");
 	while (1) {
-		usart_print("task2\n");
+		//usart_print("task2\n");
 	}
 }
 
 int _start(void *heap_start) {
-	init_malloc(heap_start, 2048);
+	init_malloc(heap_start, 1024);
 
-	create_thread(*task1);
-	create_thread(*task2);
+	//create_thread(*task1);
+	//create_thread(*task2);
+	create_thread(*run_shell);
 
     // 1. Enable Clocks (RCC)
     // We need Bit 14 (USART1) and Bit 2 (GPIOA)
@@ -113,7 +122,6 @@ int _start(void *heap_start) {
     // Bit 2:  RE (Receiver Enable)
     USART1_CR1 |= (1 << 13) | (1 << 5) | (1 << 3) | (1 << 2);
 
-	usart_print("> ");
 	interrupt_init();
 	sys_tick_init();
 	context_switch();
