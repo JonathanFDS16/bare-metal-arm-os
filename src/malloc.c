@@ -1,5 +1,4 @@
 #include "malloc.h"
-#include "utils.h"
 
 /*
  * RAM:  [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
@@ -33,13 +32,6 @@ typedef struct Header {
 Header *start_heap_ptr = 0;
 Header *last_header_ptr = 0;
 void *last_allocable_addr = 0;
-
-
-/* [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
-*  [header][header][alloc_mem][header]
- * ^       ^	   ^		  ^
- * str     s->nh   return     h->nh
- * */
 
 void init_malloc(void *heap_start, size_t heap_capacity) {
 	usart_print("Heap Starts at: ");

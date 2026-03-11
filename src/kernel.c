@@ -25,6 +25,7 @@
 #define SCB_ICSR			(*((volatile uint32_t *)(SCB_BASE + 0x04)))
 
 #define USART_BUFFER_SIZE 128
+#define ALLOC_HEAP_SIZE_BYTES 4096 //4096 bytes
 
 void delay_ms(int ms);
 void context_switch();
@@ -89,12 +90,6 @@ void task2() {
 }
 
 int _start(void *heap_start) {
-	init_malloc(heap_start, 1024);
-
-	//create_thread(*task1);
-	//create_thread(*task2);
-	create_thread(*run_shell);
-
     // 1. Enable Clocks (RCC)
     // We need Bit 14 (USART1) and Bit 2 (GPIOA)
     RCC_APB2ENR |= (1 << 14) | (1 << 2);
@@ -122,6 +117,8 @@ int _start(void *heap_start) {
     // Bit 2:  RE (Receiver Enable)
     USART1_CR1 |= (1 << 13) | (1 << 5) | (1 << 3) | (1 << 2);
 
+	init_malloc(heap_start, ALLOC_HEAP_SIZE_BYTES / sizeof(size_t));
+	create_thread(*run_shell);
 	interrupt_init();
 	sys_tick_init();
 	context_switch();
