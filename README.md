@@ -7,12 +7,12 @@ I wanted to learn OS actually works, and I came up with the idea to code a proto
 ## What does it do?
 
 I was able to implement some stuff:
-    1. USART I/O so we can send and receive data to the terminal (i.e write to the terminal)
-    2. We can malloc, but we can't free (yet). So careful with your allocations :D
-    3. Context Switching! Threads can be created.
-    4. RR Scheduler by using the chip's SysTick
-    5. Primitive shell with two commands `reboot` and `help`
-    6. Primitive syscall abilities
+1. USART I/O so we can send and receive data to the terminal (i.e write to the terminal)
+2. We can malloc, but we can't free (yet). So careful with your allocations :D
+3. Context Switching! Threads can be created.
+4. RR Scheduler by using the chip's SysTick
+5. Primitive shell with two commands `reboot` and `help`
+6. Primitive syscall abilities
 
 ## Future Plans
 
